@@ -1,0 +1,291 @@
+{{ block title }}
+Voting 
+{{ endblock }}
+{{ block content }}
+
+<style>
+   .div_visible {
+        display: block;
+    }
+    
+    .div_hidden {
+        display: none;
+    }
+</style>
+
+<p>
+    lorem .....
+</p>
+<canvas id="canvas" width="300" height="300"></canvas>
+<br><br>
+<!--Coherence %: <br>
+<input type="range" min="1" max="100" value="50" class="slider" id="coherence" style="width: 300px;" onchange="coherenceChange(this.value); document.getElementById('coherenceval').value = this.value;"/>
+<output id="coherenceval">50</output>%
+<br><br>
+Direction of coherent motion (degrees): <br>
+<input type="range" min="0" max="360" value="0" class="slider" id="coherencedirection" style="width: 300px;" onchange="coherencedirectionChange(this.value); document.getElementById('coherencedirectionval').value = this.value;"/>
+<output id="coherencedirectionval">0</output>
+<br>
+(0 degrees is to the right)-->
+
+<table class="table table-striped">
+    <tr>
+        <th>Choice</th>
+        <th>My vote</th>
+        
+    </tr>
+    {{ for choice in C.CHOICES }}
+    <tr>
+        <th>The points were going to  {{ choice }}</th>
+        <td>
+            <input type="radio" name="my-vote" value="{{ choice }}" id="radio-{{ choice }}" onclick="vote(this)">
+        </td>
+        
+    </tr>
+    {{ endfor }}
+    <div id="displaycheck">
+    <input id="displaycheckbox" type="checkbox"  name="scales" onchange="displayoff()"; title="Display other votes"/> 
+    <label>Display other votes</label>
+    </div>
+    <tr id="otherplayervotes" style.display="block">
+        {{ for choice in C.CHOICES }}
+        <td> Voters {{ choice }}
+            <ul id="votes-for-{{ choice }}" class="clear-on-redraw"></ul>
+        </td>
+    {{ endfor }}     
+    </tr>
+   
+    
+</table>
+<!--<h4>Undecided players</h4>
+<ul id="undecided" class="clear-on-redraw"></ul>-->
+<br><br><br>
+<button id="closeexp" class="otree-btn-next btn btn-primary" >End The Experiment</button>
+
+<!---<h4>Chat with teammates</h4>
+{{ chat }}-->
+
+<script>
+    let redrawableNodes = document.getElementsByClassName('clear-on-redraw');
+
+    function displayoff() {
+        checkBox=document.getElementById("displaycheckbox");
+        div=document.getElementById("otherplayervotes");
+
+        if (checkBox.checked == true){
+            div.style.display = "block";
+        } else {
+            div.style.display = "none";
+         }
+    }   
+
+    function vote(btn) {
+        liveSend({vote: parseInt(btn.value)});
+    }
+
+    function liveRecv(data) {
+        if ('finished' in data) {
+            document.getElementById('form').submit();
+        }
+
+        if ('votes' in data) {
+            for (let ele of redrawableNodes) {
+                ele.innerHTML = '';
+            }
+            //if(!player.isleader){
+                closevisible=document.getElementById("closeexp");
+                closevisible.classList.add("div_hidden");
+                closevisible.classList.remove("div_visible");
+                
+                if(!js_vars.leader){
+                        displaycheckvisible=document.getElementById("displaycheck");
+                        displaycheckvisible.classList.add("div_hidden");
+                        displaycheckvisible.classList.remove("div_visible");
+                }else{
+                    displaycheckvisible=document.getElementById("displaycheck");
+                    displaycheckvisible.classList.remove("div_hidden");
+                    displaycheckvisible.classList.add("div_visible");
+                }
+                displayoff()
+                
+                for (let [id_in_group, vote] of data.votes) {
+                   
+                    let playerName = `Participant ${id_in_group}`;
+                    let isMe = id_in_group === js_vars.my_id;
+                    let isNull = vote === null;
+                    if (isMe) {
+                        playerName += ' (me)';
+                        if (!isNull) {
+                            document.getElementById(`radio-${vote}`).checked = true;
+                        }
+                    }
+                    let bulletListId = isNull ? 'undecided' : `votes-for-${vote}`;
+                    let bulletList = document.getElementById(bulletListId);
+                    bulletList.innerHTML += `<li>${playerName}</li>`;
+                }
+            //}
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", function (event) {
+        liveSend({});
+    });
+
+</script>
+
+<script>
+
+
+    // circle drawing function borrowed from https://stackoverflow.com/questions/25095548/how-to-draw-a-circle-in-html5-canvas-using-javascript
+    function drawCircle(ctx, x, y, radius, fill, stroke, strokeWidth) {
+        ctx.beginPath()
+        ctx.arc(x, y, radius, 0, 2 * Math.PI, false)
+        if (fill) {
+            ctx.fillStyle = fill
+            ctx.fill()
+        }
+        if (stroke) {
+            ctx.lineWidth = strokeWidth
+            ctx.strokeStyle = stroke
+            ctx.stroke()
+        }
+    }
+
+    // DEBUGGING
+    var nDots = 500;
+    var coherence = 0;
+    var coherencedirection = 0; // in radians, what direction are the "coherent" dots going
+    var dots = [];
+    var lifetime = 30; // frames, this is likely 60 fps so 60 = 1 s
+    var centerx = 150;
+    var centery = 150;
+    var radius = 150;
+    var xDim = 300;
+    var yDim = 300;
+    var dotSize = 1;
+    var dotSpeed = 1; // pixels per frame
+    var dots = [];
+
+    function makeDots() {
+        // initialize dots
+        dots = [];
+        var direction, age, posx, posy;
+                for (var i = 0; i < nDots; i++) {
+                    if (Math.random() < coherence) { 
+                        direction = coherencedirection;
+                    } else {
+                        direction = Math.random()*2*Math.PI;
+                    }
+                    age = Math.floor(Math.random()*lifetime);
+                    posx = 0; posy = 0;
+                    while (Math.sqrt(Math.pow(posx - centerx, 2)+Math.pow(posy - centery, 2)) > radius) {
+                        posx = Math.round(Math.random()*xDim);
+                        posy = Math.round(Math.random()*yDim);
+                    }
+                    dots.push({direction: direction, age: age, posx: posx, posy: posy});
+                }
+    }
+
+    function init() {
+        makeDots();
+        window.requestAnimationFrame(draw);
+    }
+    function draw() {
+        var ctx = document.getElementById('canvas').getContext('2d');
+        ctx.clearRect(0,0,xDim,yDim);
+        // draw a black circle "aperture"
+        drawCircle(ctx, centerx, centery, radius, "#000000", 0, 0);
+
+        // draw all the dots
+        for (var i = 0; i < nDots; i++) {
+            drawCircle(ctx, dots[i].posx, dots[i].posy, dotSize, "#FFFFFF", 0, 0);
+        }
+
+        // update the dots
+        for (var i = 0; i < nDots; i++) {
+            dots[i].age = dots[i].age + 1;
+            if (dots[i].age >= lifetime) { // old dot, replace
+                dots[i].age = 0;
+                if (Math.random() < coherence) { 
+                    dots[i].direction = coherencedirection;
+                } else {
+                    dots[i].direction = Math.random()*360;
+                }
+                posx = 0; posy = 0;
+                while (Math.sqrt(Math.pow(posx - centerx, 2)+Math.pow(posy - centery, 2)) > radius) {
+                    posx = Math.round(Math.random()*xDim);
+                    posy = Math.round(Math.random()*yDim);
+                }
+                dots[i].posx = posx;
+                dots[i].posy = posy;
+            } else { // move dot
+                dots[i].posx = dots[i].posx + dotSpeed*Math.cos(dots[i].direction);
+                dots[i].posy = dots[i].posy + dotSpeed*Math.sin(dots[i].direction);
+                if (Math.sqrt(Math.pow( dots[i].posx - centerx, 2)+Math.pow( dots[i].posy - centery, 2)) > radius) {
+                    // dot went out of bounds, move it back to opposite side
+                    // i have already forgotten all of this algebra and I wrote this like an hour ago
+                    x1 = dots[i].posx - centerx;
+                    x2 = x1 + dotSpeed*Math.cos(dots[i].direction);
+                    y1 = dots[i].posy- centery;
+                    y2 = y1 + dotSpeed*Math.sin(dots[i].direction);
+                    if ((dots[i].direction != Math.PI/2)&&(dots[i].direction!= 3*Math.PI/2 )) { 
+                        m = (y2-y1)/(x2-x1); 
+                        b = y2 - m*x2;
+
+                        sigma = radius*radius*(1+m*m) - (b*b);
+
+                        xpos1 = (-b*m + Math.sqrt(sigma))/(1+m*m);
+                        xpos2 = (-b*m - Math.sqrt(sigma))/(1+m*m);
+
+                        ypos1 = (b+m*Math.sqrt(sigma))/(1+m*m);
+                        ypos2 =  (b-m*Math.sqrt(sigma))/(1+m*m);
+
+                        xpos1 = xpos1 + centerx;
+                        xpos2 = xpos2 + centerx;
+
+                        ypos1 = ypos1 + centery;
+                        ypos2 = ypos2 + centery;
+                    } else { 
+                        // vertically moving dots need special care
+                        xpos1 = x1 + centerx;
+                        xpos2 = x1 + centerx;
+                        
+                        ypos1 = Math.sqrt((radius*radius)-(x1*x1));
+                        ypos2 = -ypos1; 
+
+                        ypos1 = ypos1+centery;
+                        ypos2 = ypos2+centery;
+                    }
+                    d1 = Math.sqrt( Math.pow(dots[i].posx - xpos1, 2) + Math.pow(dots[i].posy - ypos1, 2));
+                    d2 = Math.sqrt( Math.pow(dots[i].posx - xpos2, 2) + Math.pow(dots[i].posy - ypos2, 2));
+                    if (d1 > d2) {
+                        dots[i].posx = xpos1; 
+                        dots[i].posy = ypos1;
+                    } else {
+                        dots[i].posx = xpos2;
+                        dots[i].posy = ypos2;
+                    }
+                }
+            }
+        }
+
+        window.requestAnimationFrame(draw);
+    }
+
+    init();
+
+    function coherenceChange(newcoherence) {
+        coherence = newcoherence/100;
+        // kill and remake all dots
+        makeDots();
+    }
+
+    function coherencedirectionChange(newcoherencedirection) {
+        coherencedirection = 2*Math.PI*newcoherencedirection/360;
+        // kill and remake all dots
+        makeDots();
+    }
+
+</script>
+
+{{ endblock }}
